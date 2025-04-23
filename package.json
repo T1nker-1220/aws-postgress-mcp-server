@@ -5,7 +5,7 @@
   "main": "build/index.js",
   "type": "module",
   "bin": {
-    "aws-postgres-mcp-server": "./build/index.js"
+    "aws-pg-mcp": "./build/index.js"
   },
   "repository": {
     "type": "git",

@@ -48,6 +48,7 @@ Add the following entry within the `mcpServers` object (adjust the path to `buil
         // Use the full, absolute path to the built index.js file
         "C:\\path\\to\\your\\aws-postgress-mcp-server\\build\\index.js" 
       ],
+      // Environment variables are passed as a standard JSON object.
       "env": {
         "DB_HOST": "your-db-host.rds.amazonaws.com",
         "DB_PORT": "5432",
@@ -65,7 +66,7 @@ Add the following entry within the `mcpServers` object (adjust the path to `buil
 }
 ```
 
-**Important:** Replace the placeholder values in the `env` object with your actual AWS PostgreSQL credentials.
+**Important:** Replace the placeholder values in the `env` object with your actual AWS PostgreSQL credentials. The `env` field must be a valid JSON object as shown.
 
 ## Usage
 
@@ -116,31 +117,31 @@ node build/index.js
 
 ## Running with `npx` (Requires Publishing to npm)
 
-While `npx` can execute packages directly from GitHub (`npx github:T1nker-1220/aws-postgress-mcp-server`), MCP clients like Cline, Cursor, or Windsurf are typically configured to use `npx` with packages published on the npm registry.
+While `npx` can execute packages directly from GitHub (`npx github:T1nker-1220/aws-postgress-mcp-server`), MCP clients (like Cline, Cursor, Windsurf) are typically configured to use `npx` with packages published on the **npm registry**.
 
 To enable running via `npx <package-name>` within MCP client configurations, you first need to publish this package to npm:
 
 1.  **Publish the package to npm:**
-    *   Ensure your `package.json` is correctly configured (name, version, description, main file, etc.). The name should be unique on npm (e.g., `@your-npm-username/aws-postgres-mcp-server`).
+    *   Ensure your `package.json` is correctly configured (name, version, description, main file, etc.). The name should be unique on npm. Using your GitHub username as a scope is common: `@t1nker-1220/aws-postgres-mcp-server`.
     *   Add a `bin` field to `package.json` pointing to the executable script (`build/index.js`) - *this is already done*.
         ```json
         "bin": {
-          "your-chosen-command-name": "./build/index.js" // e.g., "aws-pg-mcp"
+          "aws-pg-mcp": "./build/index.js" // Example command name if installed globally
         }
         ```
     *   Make sure the first line of `src/index.ts` is `#!/usr/bin/env node` (which it already is).
     *   Build the project (`pnpm run build`).
     *   Log in to npm (`npm login`).
-    *   Publish the package (`npm publish --access public` if scoped like `@username/package`).
+    *   Publish the package (`npm publish --access public` if using a scope like `@t1nker-1220/`).
 
 2.  **Configure MCP Client:**
-    Once published (e.g., as `@your-npm-username/aws-postgres-mcp-server`), you can configure clients like Cline, Cursor, or Windsurf:
+    Once published (e.g., as `@t1nker-1220/aws-postgres-mcp-server`), you can configure clients like Cline, Cursor, or Windsurf:
     ```json
     "your-server-name": {
       "command": "npx",
       "args": [
         "-y",
-        "@your-npm-username/aws-postgres-mcp-server" // Use the published package name
+        "@t1nker-1220/aws-postgres-mcp-server" // Use the actual published package name
       ],
       "env": { ... your DB credentials ... }
       // ... other settings ...
