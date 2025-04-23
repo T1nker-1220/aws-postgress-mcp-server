@@ -1,0 +1,26 @@
+{
+  "name": "aws-postgress-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for AWS PostgreSQL database",
+  "main": "build/index.js",
+  "type": "module",
+  "bin": {
+    "aws-postgres-mcp-server": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "dev": "ts-node --esm src/index.ts"
+  },
+  "keywords": ["mcp", "postgresql", "aws"],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.8.1",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.2",
+    "@types/pg": "^8.11.13",
+    "pg": "^8.15.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
