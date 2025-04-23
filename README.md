@@ -18,8 +18,8 @@ This is a Model Context Protocol (MCP) server designed to provide read-only acce
 
 1.  **Clone the repository (if applicable):**
     ```bash
-    git clone <repository-url>
-    cd aws-postgres-mcp-server
+    git clone https://github.com/T1nker-1220/aws-postgress-mcp-server.git
+    cd aws-postgress-mcp-server
     ```
 2.  **Install dependencies:**
     ```bash
@@ -114,31 +114,48 @@ pnpm start
 node build/index.js 
 ```
 
-## Running with `npx` (Requires Publishing)
+## Running with `npx` (Requires Publishing to npm)
 
-To run this server using `npx`, you would typically need to:
+While `npx` can execute packages directly from GitHub (`npx github:T1nker-1220/aws-postgress-mcp-server`), MCP clients like Cline, Cursor, or Windsurf are typically configured to use `npx` with packages published on the npm registry.
+
+To enable running via `npx <package-name>` within MCP client configurations, you first need to publish this package to npm:
 
 1.  **Publish the package to npm:**
-    *   Ensure your `package.json` is correctly configured (name, version, description, main file, etc.).
-    *   Add a `bin` field to `package.json` pointing to the executable script (`build/index.js`):
+    *   Ensure your `package.json` is correctly configured (name, version, description, main file, etc.). The name should be unique on npm (e.g., `@your-npm-username/aws-postgres-mcp-server`).
+    *   Add a `bin` field to `package.json` pointing to the executable script (`build/index.js`) - *this is already done*.
         ```json
         "bin": {
-          "aws-postgres-mcp-server": "./build/index.js"
+          "your-chosen-command-name": "./build/index.js" // e.g., "aws-pg-mcp"
         }
         ```
     *   Make sure the first line of `src/index.ts` is `#!/usr/bin/env node` (which it already is).
     *   Build the project (`pnpm run build`).
     *   Log in to npm (`npm login`).
-    *   Publish the package (`npm publish`).
+    *   Publish the package (`npm publish --access public` if scoped like `@username/package`).
 
-2.  **Run with `npx`:**
-    Once published, users could potentially run it directly (though this isn't the standard way to run MCP servers, which are usually managed by the client):
-    ```bash
-    # Set environment variables first
-    npx aws-postgres-mcp-server 
+2.  **Configure MCP Client:**
+    Once published (e.g., as `@your-npm-username/aws-postgres-mcp-server`), you can configure clients like Cline, Cursor, or Windsurf:
+    ```json
+    "your-server-name": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@your-npm-username/aws-postgres-mcp-server" // Use the published package name
+      ],
+      "env": { ... your DB credentials ... }
+      // ... other settings ...
+    }
     ```
 
-**Note:** The primary way to use this server is through configuration within an MCP client, not typically via direct `npx` execution for regular use. Publishing is only necessary if you intend to distribute it as a standalone package.
+**Note:** The primary way to use this server is through configuration within an MCP client (pointing to the local build path or a published npm package). Direct execution via `npx` (either from npm or GitHub) is mainly for testing or specific use cases outside of standard client integration.
+
+## Compatibility with Registries (e.g., Smithery.ai)
+
+This server adheres to the Model Context Protocol (MCP) specification and communicates via stdio, making it compatible in principle with MCP server registries and platforms like [Smithery.ai](https://smithery.ai/docs).
+
+To list or host this server on such platforms, you will likely need to:
+1.  Package the server, typically by publishing it as an npm package (see the `npx` section above). Some platforms might also support Docker images.
+2.  Follow the specific registration or deployment instructions provided by the platform (e.g., Smithery.ai).
 
 ## Development
 

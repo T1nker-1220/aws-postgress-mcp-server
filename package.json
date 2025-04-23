@@ -1,12 +1,17 @@
 {
   "name": "aws-postgress-mcp-server",
   "version": "1.0.0",
-  "description": "MCP server for AWS PostgreSQL database",
+  "description": "MCP server for AWS PostgreSQL database that provides read-only SQL query capabilities",
   "main": "build/index.js",
   "type": "module",
   "bin": {
     "aws-postgres-mcp-server": "./build/index.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/T1nker-1220/aws-postgress-mcp-server.git"
+  },
+  "homepage": "https://github.com/T1nker-1220/aws-postgress-mcp-server",
   "scripts": {
     "build": "tsc",
     "start": "node build/index.js",
