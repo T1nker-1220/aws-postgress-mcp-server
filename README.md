@@ -1,41 +1,23 @@
 # AWS PostgreSQL MCP Server
 
-This is a Model Context Protocol (MCP) server designed to provide read-only access to an AWS PostgreSQL database. It exposes a single tool, `query`, allowing MCP clients (like Cline or Claude Desktop) to execute safe, read-only SQL queries.
+A Model Context Protocol (MCP) server providing read-only SQL query access to an AWS PostgreSQL database via the `query` tool. Configuration uses environment variables.
 
-## Features
+## Setup
 
-*   **Read-Only Access:** Securely queries your AWS PostgreSQL database without allowing data modification.
-*   **SQL Validation:** Automatically checks if submitted queries are read-only (SELECT, WITH, SHOW, DESCRIBE, EXPLAIN) and rejects potentially harmful commands (INSERT, UPDATE, DELETE, etc.).
-*   **Stdio Transport:** Communicates with MCP clients using standard input/output (stdio), the default transport mechanism.
-*   **Configurable:** Uses environment variables for database connection details.
-
-## Prerequisites
-
-*   Node.js and pnpm installed.
-*   Access credentials for your AWS PostgreSQL database.
-
-## Installation & Setup
-
-1.  **Clone the repository (if applicable):**
+1.  **Clone:**
     ```bash
     git clone https://github.com/T1nker-1220/aws-postgress-mcp-server.git
     cd aws-postgress-mcp-server
     ```
-2.  **Install dependencies:**
+2.  **Install & Build:**
     ```bash
     pnpm install
-    ```
-3.  **Build the server:**
-    ```bash
     pnpm run build
     ```
-    This compiles the TypeScript code into JavaScript in the `build/` directory.
 
-## Configuration for MCP Clients (e.g., Cline)
+## Configuration (for Cline/Windsurf)
 
-To use this server with an MCP client, you need to add its configuration to the client's settings file. For Cline, this is typically located at: `c:\Users\<YourUsername>\AppData\Roaming\Windsurf\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
-
-Add the following entry within the `mcpServers` object (adjust the path to `build/index.js` if necessary):
+Add this server to your MCP client's settings file (e.g., `c:\Users\<User>\AppData\Roaming\Windsurf\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`):
 
 ```json
 {
@@ -45,43 +27,31 @@ Add the following entry within the `mcpServers` object (adjust the path to `buil
     "aws-postgres-mcp-server": {
       "command": "node",
       "args": [
-        // Use the full, absolute path to the built index.js file
-        "C:\\path\\to\\your\\aws-postgress-mcp-server\\build\\index.js" 
+        // Full path to the built index.js
+        "C:\\Users\\NATH\\Documents\\Cline\\MCP\\aws-postgress-mcp-server\\build\\index.js" 
       ],
-      // Environment variables are passed as a standard JSON object.
+      // Database credentials go in the 'env' object
       "env": {
-        "DB_HOST": "your-db-host.rds.amazonaws.com",
+        "DB_HOST": "YOUR_HOST.rds.amazonaws.com",
         "DB_PORT": "5432",
-        "DB_NAME": "your_database_name",
-        "DB_USER": "your_database_user",
-        "DB_PASSWORD": "your_database_password"
+        "DB_NAME": "YOUR_DB_NAME",
+        "DB_USER": "YOUR_DB_USER",
+        "DB_PASSWORD": "YOUR_PASSWORD"
       },
-      "transportType": "stdio", // Explicitly using stdio
-      "disabled": false,        // Ensure the server is enabled
-      "autoApprove": []         // Configure auto-approval if desired (e.g., ["query"])
+      "transportType": "stdio",
+      "disabled": false,
+      "autoApprove": [] 
     }
-
     // ... other servers ...
   }
 }
 ```
 
-**Important:** Replace the placeholder values in the `env` object with your actual AWS PostgreSQL credentials. The `env` field must be a valid JSON object as shown.
+**-> Replace the placeholder values in the `env` object with your actual credentials.**
 
 ## Usage
 
-Once configured, the MCP client will automatically start the server. You can then use the `query` tool:
-
-**Tool:** `query`
-**Description:** Run a read-only SQL query against the AWS PostgreSQL database.
-**Input:**
-```json
-{
-  "sql": "YOUR_READ_ONLY_SQL_QUERY"
-}
-```
-
-**Example (using Cline's `use_mcp_tool`):**
+Once configured, the client will start the server. Use the `query` tool:
 
 ```xml
 <use_mcp_tool>
@@ -89,76 +59,13 @@ Once configured, the MCP client will automatically start the server. You can the
   <tool_name>query</tool_name>
   <arguments>
   {
-    "sql": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' LIMIT 5;"
+    "sql": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
   }
   </arguments>
 </use_mcp_tool>
 ```
 
-The server will return the query results as a JSON string or an error message if the query fails or is not read-only.
+## Notes
 
-## Running Standalone (for testing)
-
-You can run the server directly for testing purposes, but it requires the environment variables to be set:
-
-```bash
-# Set environment variables (example for PowerShell)
-$env:DB_HOST="your-db-host..."
-$env:DB_PORT="5432"
-$env:DB_NAME="your_db_name"
-$env:DB_USER="your_db_user"
-$env:DB_PASSWORD="your_db_password"
-
-# Run the built server
-pnpm start 
-# or
-node build/index.js 
-```
-
-## Running with `npx` (Requires Publishing to npm)
-
-While `npx` can execute packages directly from GitHub (`npx github:T1nker-1220/aws-postgress-mcp-server`), MCP clients (like Cline, Cursor, Windsurf) are typically configured to use `npx` with packages published on the **npm registry**.
-
-To enable running via `npx <package-name>` within MCP client configurations, you first need to publish this package to npm:
-
-1.  **Publish the package to npm:**
-    *   Ensure your `package.json` is correctly configured (name, version, description, main file, etc.). The name should be unique on npm. Using your GitHub username as a scope is common: `@t1nker-1220/aws-postgres-mcp-server`.
-    *   Add a `bin` field to `package.json` pointing to the executable script (`build/index.js`) - *this is already done*.
-        ```json
-        "bin": {
-          "aws-pg-mcp": "./build/index.js" // Example command name if installed globally
-        }
-        ```
-    *   Make sure the first line of `src/index.ts` is `#!/usr/bin/env node` (which it already is).
-    *   Build the project (`pnpm run build`).
-    *   Log in to npm (`npm login`).
-    *   Publish the package (`npm publish --access public` if using a scope like `@t1nker-1220/`).
-
-2.  **Configure MCP Client:**
-    Once published (e.g., as `@t1nker-1220/aws-postgres-mcp-server`), you can configure clients like Cline, Cursor, or Windsurf:
-    ```json
-    "your-server-name": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@t1nker-1220/aws-postgres-mcp-server" // Use the actual published package name
-      ],
-      "env": { ... your DB credentials ... }
-      // ... other settings ...
-    }
-    ```
-
-**Note:** The primary way to use this server is through configuration within an MCP client (pointing to the local build path or a published npm package). Direct execution via `npx` (either from npm or GitHub) is mainly for testing or specific use cases outside of standard client integration.
-
-## Compatibility with Registries (e.g., Smithery.ai)
-
-This server adheres to the Model Context Protocol (MCP) specification and communicates via stdio, making it compatible in principle with MCP server registries and platforms like [Smithery.ai](https://smithery.ai/docs).
-
-To list or host this server on such platforms, you will likely need to:
-1.  Package the server, typically by publishing it as an npm package (see the `npx` section above). Some platforms might also support Docker images.
-2.  Follow the specific registration or deployment instructions provided by the platform (e.g., Smithery.ai).
-
-## Development
-
-*   Run in development mode (watches for changes): `pnpm run dev`
-*   Build: `pnpm run build`
+*   The server only allows read-only queries (SELECT, SHOW, etc.).
+*   To configure clients using `npx @t1nker-1220/aws-postgres-mcp-server ...`, the package must first be published to npm. The configuration would still use the `env` object for credentials.
