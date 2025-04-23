@@ -14,8 +14,8 @@
   "homepage": "https://github.com/T1nker-1220/aws-postgress-mcp-server",
   "scripts": {
     "build": "tsc",
-    "start": "node build/index.js",
-    "dev": "ts-node --esm src/index.ts"
+    "start": "node build/index.js \"postgresql://username:password@host:port/database\"",
+    "dev": "ts-node --esm src/index.ts \"postgresql://username:password@host:port/database\""
   },
   "keywords": ["mcp", "postgresql", "aws"],
   "author": "",
