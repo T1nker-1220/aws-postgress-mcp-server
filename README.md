@@ -7,7 +7,7 @@ This is a Model Context Protocol (MCP) server designed to provide read-only acce
 *   **Read-Only Access:** Securely queries your AWS PostgreSQL database without allowing data modification.
 *   **SQL Validation:** Automatically checks if submitted queries are read-only (SELECT, WITH, SHOW, DESCRIBE, EXPLAIN) and rejects potentially harmful commands (INSERT, UPDATE, DELETE, etc.).
 *   **Stdio Transport:** Communicates with MCP clients using standard input/output (stdio), the default transport mechanism.
-*   **Configurable:** Uses environment variables for database connection details.
+*   **Configurable:** Uses a PostgreSQL connection string passed as a command-line argument.
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ This is a Model Context Protocol (MCP) server designed to provide read-only acce
 
 To use this server with an MCP client, you need to add its configuration to the client's settings file. For Cline, this is typically located at: `c:\Users\<YourUsername>\AppData\Roaming\Windsurf\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
 
-Add the following entry within the `mcpServers` object (adjust the path to `build/index.js` if necessary):
+Add the following entry within the `mcpServers` object:
 
 ```json
 {
@@ -46,16 +46,10 @@ Add the following entry within the `mcpServers` object (adjust the path to `buil
       "command": "node",
       "args": [
         // Use the full, absolute path to the built index.js file
-        "C:\\path\\to\\your\\aws-postgress-mcp-server\\build\\index.js" 
+        "C:\\Users\\NATH\\Documents\\Cline\\MCP\\aws-postgress-mcp-server\\build\\index.js",
+        // PostgreSQL connection string as the last argument
+        "postgresql://minrights:2Knowthyself33!@minrights-pg.chq86qgigowu.us-east-1.rds.amazonaws.com:5432/minrights"
       ],
-      // Environment variables are passed as a standard JSON object.
-      "env": {
-        "DB_HOST": "your-db-host.rds.amazonaws.com",
-        "DB_PORT": "5432",
-        "DB_NAME": "your_database_name",
-        "DB_USER": "your_database_user",
-        "DB_PASSWORD": "your_database_password"
-      },
       "transportType": "stdio", // Explicitly using stdio
       "disabled": false,        // Ensure the server is enabled
       "autoApprove": []         // Configure auto-approval if desired (e.g., ["query"])
@@ -66,7 +60,7 @@ Add the following entry within the `mcpServers` object (adjust the path to `buil
 }
 ```
 
-**Important:** Replace the placeholder values in the `env` object with your actual AWS PostgreSQL credentials. The `env` field must be a valid JSON object as shown.
+**Important:** The PostgreSQL connection string is passed directly as the last argument in the `args` array. The format is: `postgresql://username:password@host:port/database`
 
 ## Usage
 
@@ -99,20 +93,16 @@ The server will return the query results as a JSON string or an error message if
 
 ## Running Standalone (for testing)
 
-You can run the server directly for testing purposes, but it requires the environment variables to be set:
+You can run the server directly for testing purposes by passing the PostgreSQL connection string as a command-line argument:
 
 ```bash
-# Set environment variables (example for PowerShell)
-$env:DB_HOST="your-db-host..."
-$env:DB_PORT="5432"
-$env:DB_NAME="your_db_name"
-$env:DB_USER="your_db_user"
-$env:DB_PASSWORD="your_db_password"
-
-# Run the built server
-pnpm start 
+# Run the built server with a connection string
+pnpm start "postgresql://username:password@host:port/database"
 # or
-node build/index.js 
+node build/index.js "postgresql://username:password@host:port/database"
+
+# Example with actual values
+node build/index.js "postgresql://minrights:2Knowthyself33!@minrights-pg.chq86qgigowu.us-east-1.rds.amazonaws.com:5432/minrights"
 ```
 
 ## Running with `npx` (Requires Publishing to npm)
@@ -141,11 +131,18 @@ To enable running via `npx <package-name>` within MCP client configurations, you
       "command": "npx",
       "args": [
         "-y",
-        "@t1nker-1220/aws-postgres-mcp-server" // Use the actual published package name
+        "@t1nker-1220/aws-postgres-mcp-server", // Use the actual published package name
+        "postgresql://username:password@host:port/database" // Connection string as the last argument
       ],
-      "env": { ... your DB credentials ... }
-      // ... other settings ...
+      "transportType": "stdio",
+      "disabled": false,
+      "autoApprove": []
     }
+    ```
+    
+    This is similar to running the server directly with npx:
+    ```bash
+    npx -y @t1nker-1220/aws-postgres-mcp-server "postgresql://username:password@host:port/database"
     ```
 
 **Note:** The primary way to use this server is through configuration within an MCP client (pointing to the local build path or a published npm package). Direct execution via `npx` (either from npm or GitHub) is mainly for testing or specific use cases outside of standard client integration.
