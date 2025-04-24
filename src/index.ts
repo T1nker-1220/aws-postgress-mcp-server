@@ -210,64 +210,129 @@ class PostgresServer {
    */
   private setupResourceHandlers() {
     const dbName = DB_CONFIG.database || 'unknown_db';
-    // Define the schemas to expose
     const schemasToExpose = ['minrights', 'public', 'spatial', 'ed_data', 'data', 'ose'];
-    const baseUri = `aws-pg://${dbName}/schema`;
+    const baseUriSchema = `aws-pg://${dbName}/schema`; // URI for schema resources
 
-    // Handler for listing available resources
+    // Handler for listing available top-level resources (schemas)
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       const resources: Resource[] = schemasToExpose.map(schemaName => ({
-        uri: `${baseUri}/${schemaName}/tables`,
-        name: `Tables in schema: ${schemaName}`,
-        description: `List of tables in the ${schemaName} schema of the ${dbName} database.`,
-        mimeType: 'text/plain',
+        uri: `${baseUriSchema}/${schemaName}`, // URI points to the schema itself
+        name: `Schema: ${schemaName}`,
+        description: `Browse tables within the ${schemaName} schema of the ${dbName} database.`,
+        mimeType: 'application/json', // Indicate that reading returns JSON list of tables
       }));
       return { resources };
     });
 
-    // Handler for reading a specific resource
+    // Handler for reading a specific resource (either a schema or a table)
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      const uri = request.params.uri;
-      const uriPrefix = `${baseUri}/`;
-      const uriSuffix = '/tables';
+      let uri = request.params.uri; // Use 'let' so we can modify it
+      // Strip leading '@' if present (added by some clients like Cline)
+      if (uri.startsWith('@')) {
+        uri = uri.substring(1);
+      }
 
-      // Check if the URI matches the expected pattern for schema tables
-      if (uri.startsWith(uriPrefix) && uri.endsWith(uriSuffix)) {
-        const schemaName = uri.substring(uriPrefix.length, uri.length - uriSuffix.length);
+      const schemaUriPrefix = `${baseUriSchema}/`;
 
-        // Validate if the requested schema is one we intend to expose
+      // Check if it's a schema URI (e.g., .../schema/public)
+      if (uri.startsWith(schemaUriPrefix) && !uri.includes('/table/')) {
+        const schemaName = uri.substring(schemaUriPrefix.length);
+
         if (schemasToExpose.includes(schemaName)) {
           try {
-            // Use the existing pool to get table names for the specific schema
-            const query = `
+            // Query for tables within this schema
+            const tableQuery = `
               SELECT table_name
               FROM information_schema.tables
               WHERE table_schema = $1
               ORDER BY table_name;
             `;
-            const result = await this.pool.query(query, [schemaName]); // Use parameterized query
-            const tableNames = result.rows.map(row => row.table_name).join('\n');
+            const tableResult = await this.pool.query(tableQuery, [schemaName]);
 
+            // Return a list of *table* resources
+            const tableResources: Resource[] = tableResult.rows.map(row => {
+              const tableName = row.table_name;
+              return {
+                uri: `${uri}/table/${tableName}`, // Construct table URI
+                name: tableName,
+                description: `Schema definition for table ${schemaName}.${tableName}`,
+                mimeType: 'text/plain', // Content will be table schema
+              };
+            });
+
+            // MCP allows ReadResource to return multiple Resource definitions
+            // We wrap them in a ResourceContents object where the 'resources' field holds the list.
+            // A client would interpret this as the content of the schema resource *being* the list of table resources.
+            // const contents: ResourceContents[] = [{ uri: uri, resources: tableResources }];
+            // return { contents };
+
+            // --- New Approach: Return table list as JSON text --- //
+            const tableListJson = JSON.stringify(tableResources, null, 2); // Pretty-print JSON
             const contents: ResourceContents[] = [
               {
-                uri: uri,
-                mimeType: 'text/plain',
-                text: `Tables in schema ${schemaName} of ${dbName}:\n${tableNames || '(No tables found)'}`,
+                uri: uri, // URI of the schema resource itself
+                mimeType: 'application/json',
+                text: tableListJson, // Return the list as JSON text
               },
             ];
             return { contents };
 
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            throw new McpError(ErrorCode.InternalError, `Failed to read resource ${uri}: ${errorMessage}`);
+            throw new McpError(ErrorCode.InternalError, `Failed to list tables for schema ${schemaName}: ${errorMessage}`);
           }
         } else {
-          // Schema name extracted but not in the allowed list
           throw new McpError(ErrorCode.InvalidParams, `Schema not exposed: ${schemaName}`);
         }
       }
 
-      // Handle other potential resource URIs here if you add more types later
+      // Check if it's a table URI (e.g., .../schema/public/table/users)
+      const tableUriPattern = new RegExp(`^${schemaUriPrefix}([^/]+)/table/([^/]+)$`);
+      const tableMatch = uri.match(tableUriPattern);
+
+      if (tableMatch) {
+        const schemaName = tableMatch[1];
+        const tableName = tableMatch[2];
+
+        if (schemasToExpose.includes(schemaName)) {
+          try {
+            // Query for column definitions of this table
+            const columnQuery = `
+              SELECT column_name, data_type, is_nullable
+              FROM information_schema.columns
+              WHERE table_schema = $1 AND table_name = $2
+              ORDER BY ordinal_position;
+            `;
+            const columnResult = await this.pool.query(columnQuery, [schemaName, tableName]);
+
+            if (columnResult.rows.length === 0) {
+               throw new McpError(ErrorCode.InvalidParams, `Table not found or no columns: ${schemaName}.${tableName}`);
+            }
+
+            // Format the schema information
+            let schemaText = `Schema for table: ${schemaName}.${tableName}\n\n`;
+            schemaText += columnResult.rows.map(col =>
+              `- ${col.column_name}: ${col.data_type} (${col.is_nullable === 'YES' ? 'NULLABLE' : 'NOT NULL'})`
+            ).join('\n');
+
+            const contents: ResourceContents[] = [
+              {
+                uri: uri,
+                mimeType: 'text/plain',
+                text: schemaText,
+              },
+            ];
+            return { contents };
+
+          } catch (error) {
+             if (error instanceof McpError) throw error; // Re-throw known MCP errors
+             const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new McpError(ErrorCode.InternalError, `Failed to read schema for table ${schemaName}.${tableName}: ${errorMessage}`);
+          }
+        } else {
+           throw new McpError(ErrorCode.InvalidParams, `Schema not exposed: ${schemaName}`);
+        }
+      }
 
       // If URI format is not recognized
       throw new McpError(ErrorCode.InvalidParams, `Resource URI not found or format incorrect: ${uri}`);
