@@ -6,6 +6,10 @@ import {
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  Resource,
+  ResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
 import pg from 'pg';
 
@@ -82,11 +86,12 @@ class PostgresServer {
     this.server = new Server(
       {
         name: 'aws-postgres-mcp-server',
-        version: '1.0.0',
+        version: '1.1.0',
       },
       {
         capabilities: {
           tools: {},
+          resources: {}, // <-- Add this empty object to enable resources
         },
       }
     );
@@ -96,7 +101,9 @@ class PostgresServer {
 
     // Set up the tool handlers
     this.setupToolHandlers();
-    
+    // Set up the resource handlers
+    this.setupResourceHandlers(); // <-- Add this call
+
     // Error handling
     this.server.onerror = (error) => console.error('[MCP Error]', error);
     process.on('SIGINT', async () => {
@@ -195,6 +202,75 @@ class PostgresServer {
           isError: true,
         };
       }
+    });
+  }
+
+  /**
+   * Sets up the resource handlers for the MCP server
+   */
+  private setupResourceHandlers() {
+    const dbName = DB_CONFIG.database || 'unknown_db';
+    // Define the schemas to expose
+    const schemasToExpose = ['minrights', 'public', 'spatial', 'ed_data', 'data', 'ose'];
+    const baseUri = `aws-pg://${dbName}/schema`;
+
+    // Handler for listing available resources
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      const resources: Resource[] = schemasToExpose.map(schemaName => ({
+        uri: `${baseUri}/${schemaName}/tables`,
+        name: `Tables in schema: ${schemaName}`,
+        description: `List of tables in the ${schemaName} schema of the ${dbName} database.`,
+        mimeType: 'text/plain',
+      }));
+      return { resources };
+    });
+
+    // Handler for reading a specific resource
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const uri = request.params.uri;
+      const uriPrefix = `${baseUri}/`;
+      const uriSuffix = '/tables';
+
+      // Check if the URI matches the expected pattern for schema tables
+      if (uri.startsWith(uriPrefix) && uri.endsWith(uriSuffix)) {
+        const schemaName = uri.substring(uriPrefix.length, uri.length - uriSuffix.length);
+
+        // Validate if the requested schema is one we intend to expose
+        if (schemasToExpose.includes(schemaName)) {
+          try {
+            // Use the existing pool to get table names for the specific schema
+            const query = `
+              SELECT table_name
+              FROM information_schema.tables
+              WHERE table_schema = $1
+              ORDER BY table_name;
+            `;
+            const result = await this.pool.query(query, [schemaName]); // Use parameterized query
+            const tableNames = result.rows.map(row => row.table_name).join('\n');
+
+            const contents: ResourceContents[] = [
+              {
+                uri: uri,
+                mimeType: 'text/plain',
+                text: `Tables in schema ${schemaName} of ${dbName}:\n${tableNames || '(No tables found)'}`,
+              },
+            ];
+            return { contents };
+
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new McpError(ErrorCode.InternalError, `Failed to read resource ${uri}: ${errorMessage}`);
+          }
+        } else {
+          // Schema name extracted but not in the allowed list
+          throw new McpError(ErrorCode.InvalidParams, `Schema not exposed: ${schemaName}`);
+        }
+      }
+
+      // Handle other potential resource URIs here if you add more types later
+
+      // If URI format is not recognized
+      throw new McpError(ErrorCode.InvalidParams, `Resource URI not found or format incorrect: ${uri}`);
     });
   }
 
