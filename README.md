@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/t1nker-1220-aws-postgress-mcp-server-badge.png)](https://mseep.ai/app/t1nker-1220-aws-postgress-mcp-server)
+
 # AWS PostgreSQL MCP Server
 
 A Model Context Protocol (MCP) server providing read-only SQL query access to an AWS PostgreSQL database via the `query` tool. Configuration uses environment variables.
